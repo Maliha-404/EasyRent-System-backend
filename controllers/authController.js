@@ -23,8 +23,14 @@ const toSafeUser = (user) => ({
 const normalizeRole = (value = '') => {
     const role = String(value).trim().toLowerCase();
     const roleMap = {
-        user: 'user',
-        owner: 'owner',
+        user: 'tenant',
+        tenant: 'tenant',
+        owner: 'flat_owner',
+        flat_owner: 'flat_owner',
+        flatowner: 'flat_owner',
+        land_owner: 'land_owner',
+        landowner: 'land_owner',
+        landlord: 'land_owner',
         admin: 'admin',
         central_admin: 'admin',
         centraladmin: 'admin'
@@ -35,13 +41,17 @@ const normalizeRole = (value = '') => {
 const normalizePersona = (value = '') => {
     const persona = String(value).trim().toLowerCase();
     const personaMap = {
-        user: 'user',
+        user: 'tenant',
         tenant: 'tenant',
-        buyer: 'buyer',
-        renter: 'renter',
-        owner: 'owner',
+        buyer: 'tenant',
+        renter: 'tenant',
+        owner: 'flat_owner',
+        flat_owner: 'flat_owner',
+        flatowner: 'flat_owner',
         landlord: 'landlord',
-        seller: 'seller',
+        land_owner: 'land_owner',
+        landowner: 'land_owner',
+        seller: 'flat_owner',
         admin: 'central_admin',
         central_admin: 'central_admin',
         centraladmin: 'central_admin'
@@ -79,13 +89,13 @@ const registerUser = async (req, res) => {
 
         if (role && persona && roleFromPersona && normalizeRole(role) !== roleFromPersona) {
             return res.status(400).json({
-                message: 'Role and persona mismatch. Example: tenant/buyer/renter => user, seller/landlord => owner'
+                message: 'Role and persona mismatch. Example: tenant => tenant, landlord => land_owner, seller => flat_owner'
             });
         }
 
         if (!normalizedRole) {
             return res.status(400).json({
-                message: 'Invalid role. Allowed values: user or owner'
+                message: 'Invalid role. Allowed values: tenant, land_owner, or flat_owner'
             });
         }
 
@@ -106,13 +116,14 @@ const registerUser = async (req, res) => {
         if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        const requiresApproval = normalizedRole === 'land_owner' || normalizedRole === 'flat_owner';
         const newUser = {
             fullName: String(fullName).trim(),
             email: normalizedEmail,
             password: hashedPassword,
             role: normalizedRole,
             persona: normalizedPersona || normalizedRole,
-            status: normalizedRole === 'owner' ? 'Pending' : 'Active',
+            status: requiresApproval ? 'Pending' : 'Active',
             phoneNumber: phone,
             profile: {
                 profilePicture: profilePicture || '',
@@ -153,8 +164,8 @@ const loginUser = async (req, res) => {
             return res.status(403).json({ message: `Account is ${accountStatus.toLowerCase()}. Please contact support.` });
         }
 
-        if (user.role === 'owner' && accountStatus === 'Pending') {
-            return res.status(403).json({ message: 'Owner account is pending admin verification' });
+        if ((user.role === 'land_owner' || user.role === 'flat_owner') && accountStatus === 'Pending') {
+            return res.status(403).json({ message: 'Your owner account is pending admin verification' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);

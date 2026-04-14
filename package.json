@@ -5,7 +5,10 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed:users": "node scripts/seedUsers.js"
+    "seed:users": "node scripts/seedUsers.js",
+    "seed:roles": "node scripts/seedUsers.js",
+    "seed:structure": "node scripts/seedStructure.js",
+    "seed:all": "npm run seed:roles && npm run seed:structure"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

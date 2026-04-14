@@ -12,6 +12,8 @@ app.use(express.json());
 // Auth-only API routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/public', require('./routes/publicRoutes'));
+app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 
 const PORT = process.env.PORT || 5000;
 
