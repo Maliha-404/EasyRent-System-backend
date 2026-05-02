@@ -25,15 +25,17 @@ const normalizeRole = (value = '') => {
     const roleMap = {
         user: 'tenant',
         tenant: 'tenant',
-        owner: 'flat_owner',
-        flat_owner: 'flat_owner',
-        flatowner: 'flat_owner',
-        land_owner: 'land_owner',
-        landowner: 'land_owner',
-        landlord: 'land_owner',
+        owner: 'owner',
+        flat_owner: 'owner',
+        flatowner: 'owner',
+        land_owner: 'owner',
+        landowner: 'owner',
+        landlord: 'owner',
         admin: 'admin',
         central_admin: 'admin',
-        centraladmin: 'admin'
+        centraladmin: 'admin',
+        sub_admin: 'sub_admin',
+        subadmin: 'sub_admin'
     };
     return roleMap[role] || null;
 };
@@ -45,13 +47,13 @@ const normalizePersona = (value = '') => {
         tenant: 'tenant',
         buyer: 'tenant',
         renter: 'tenant',
-        owner: 'flat_owner',
-        flat_owner: 'flat_owner',
-        flatowner: 'flat_owner',
-        landlord: 'landlord',
-        land_owner: 'land_owner',
-        landowner: 'land_owner',
-        seller: 'flat_owner',
+        owner: 'owner',
+        flat_owner: 'owner',
+        flatowner: 'owner',
+        landlord: 'owner',
+        land_owner: 'owner',
+        landowner: 'owner',
+        seller: 'owner',
         admin: 'central_admin',
         central_admin: 'central_admin',
         centraladmin: 'central_admin'
@@ -95,7 +97,7 @@ const registerUser = async (req, res) => {
 
         if (!normalizedRole) {
             return res.status(400).json({
-                message: 'Invalid role. Allowed values: tenant, land_owner, or flat_owner'
+                message: 'Invalid role. Allowed values: tenant, owner'
             });
         }
 
@@ -116,7 +118,7 @@ const registerUser = async (req, res) => {
         if (existingUser) return res.status(400).json({ message: 'User already exists' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const requiresApproval = normalizedRole === 'land_owner' || normalizedRole === 'flat_owner';
+        const requiresApproval = normalizedRole === 'owner';
         const newUser = {
             fullName: String(fullName).trim(),
             email: normalizedEmail,
@@ -164,7 +166,7 @@ const loginUser = async (req, res) => {
             return res.status(403).json({ message: `Account is ${accountStatus.toLowerCase()}. Please contact support.` });
         }
 
-        if ((user.role === 'land_owner' || user.role === 'flat_owner') && accountStatus === 'Pending') {
+        if (user.role === 'owner' && accountStatus === 'Pending') {
             return res.status(403).json({ message: 'Your owner account is pending admin verification' });
         }
 

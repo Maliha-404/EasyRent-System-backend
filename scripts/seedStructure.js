@@ -46,14 +46,13 @@ const seedStructure = async () => {
         await connectDB();
         const db = getDB();
 
-        const [landOwners, flatOwners, tenants] = await Promise.all([
-            db.collection('users').find({ role: 'land_owner', status: 'Active' }).toArray(),
-            db.collection('users').find({ role: 'flat_owner', status: 'Active' }).toArray(),
+        const [owners, tenants] = await Promise.all([
+            db.collection('users').find({ role: 'owner', status: 'Active' }).toArray(),
             db.collection('users').find({ role: 'tenant', status: 'Active' }).toArray()
         ]);
 
-        if (landOwners.length === 0 || flatOwners.length === 0 || tenants.length === 0) {
-            throw new Error('Active tenant, land_owner, and flat_owner accounts are required. Run npm run seed:roles first.');
+        if (owners.length === 0 || tenants.length === 0) {
+            throw new Error('Active tenant and owner accounts are required. Run npm run seed:users first.');
         }
 
         const collections = ['zones', 'blocks', 'plots', 'buildings', 'floors', 'units', 'bookings', 'payments', 'notices'];
@@ -100,7 +99,7 @@ const seedStructure = async () => {
         for (let i = 0; i < mockBuildings.length; i += 1) {
             const building = mockBuildings[i];
             const blockId = blockIdByArea.get(building.areaId);
-            const owner = landOwners[i % landOwners.length];
+            const owner = owners[i % owners.length];
 
             const plotCreated = await plotsCollection.insertOne({
                 blockId,
@@ -145,7 +144,7 @@ const seedStructure = async () => {
             }
 
             const floorId = floorMap.get(floorKey);
-            const flatOwner = flatOwners[(flat.floor + flat.flat_number.length) % flatOwners.length];
+            const flatOwner = owners[(flat.floor + flat.flat_number.length) % owners.length];
 
             await unitsCollection.insertOne({
                 _legacyId: flat.id,
@@ -224,7 +223,7 @@ const seedStructure = async () => {
         for (let i = 0; i < mockNotices.length; i += 1) {
             const notice = mockNotices[i];
             const building = targetBuildings[i % targetBuildings.length];
-            const owner = flatOwners[i % flatOwners.length];
+            const owner = owners[i % owners.length];
 
             await noticesCollection.insertOne({
                 ownerId: owner._id,

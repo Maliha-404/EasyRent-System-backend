@@ -18,94 +18,64 @@ const usersToSeed = [
         profile: { profilePicture: '', address: 'HQ', preferredArea: 'Global', nid: 'ADMIN0001', bio: 'Only central admin account' }
     },
     {
-        fullName: 'Tenant One',
+        fullName: 'Kamrul Hasan',
         email: 'tenant1@easyrent.com',
         password: '1234',
         role: 'tenant',
         persona: 'tenant',
         status: 'Active',
         phoneNumber: '+8801700000201',
-        profile: { profilePicture: '', address: 'Uttara', preferredArea: 'Uttara', nid: 'TENANT001', bio: 'Tenant account 1' }
+        profile: { profilePicture: '', address: 'Uttara', preferredArea: 'Uttara', nid: 'TENANT001', bio: 'Looking for a flat in Uttara' }
     },
     {
-        fullName: 'Tenant Two',
+        fullName: 'Nusrat Jahan',
         email: 'tenant2@easyrent.com',
         password: '1234',
         role: 'tenant',
         persona: 'tenant',
         status: 'Active',
         phoneNumber: '+8801700000202',
-        profile: { profilePicture: '', address: 'Mirpur', preferredArea: 'Mirpur', nid: 'TENANT002', bio: 'Tenant account 2' }
+        profile: { profilePicture: '', address: 'Mirpur', preferredArea: 'Mirpur', nid: 'TENANT002', bio: 'Looking for a 3-bed apartment' }
     },
     {
-        fullName: 'Tenant Three',
+        fullName: 'Asif Rahman',
         email: 'tenant3@easyrent.com',
         password: '1234',
         role: 'tenant',
         persona: 'tenant',
         status: 'Active',
         phoneNumber: '+8801700000203',
-        profile: { profilePicture: '', address: 'Bashundhara', preferredArea: 'Bashundhara', nid: 'TENANT003', bio: 'Tenant account 3' }
+        profile: { profilePicture: '', address: 'Bashundhara', preferredArea: 'Bashundhara', nid: 'TENANT003', bio: 'University student looking for housing' }
     },
     {
-        fullName: 'Land Owner One',
-        email: 'landowner1@easyrent.com',
+        fullName: 'Abdul Karim',
+        email: 'owner1@easyrent.com',
         password: '1234',
-        role: 'land_owner',
-        persona: 'land_owner',
+        role: 'owner',
+        persona: 'owner',
         status: 'Active',
         phoneNumber: '+8801700000301',
-        profile: { profilePicture: '', address: 'Sector 11', preferredArea: 'Uttara', nid: 'LANDOWN001', bio: 'Land owner account 1' }
+        profile: { profilePicture: '', address: 'Sector 11', preferredArea: 'Uttara', nid: 'OWNER001', bio: 'Property developer and owner in Uttara' }
     },
     {
-        fullName: 'Land Owner Two',
-        email: 'landowner2@easyrent.com',
+        fullName: 'Farida Begum',
+        email: 'owner2@easyrent.com',
         password: '1234',
-        role: 'land_owner',
-        persona: 'land_owner',
+        role: 'owner',
+        persona: 'owner',
         status: 'Pending',
         phoneNumber: '+8801700000302',
-        profile: { profilePicture: '', address: 'Sector 12', preferredArea: 'Uttara', nid: 'LANDOWN002', bio: 'Land owner account 2' }
+        profile: { profilePicture: '', address: 'Sector 12', preferredArea: 'Uttara', nid: 'OWNER002', bio: 'Building owner' }
     },
     {
-        fullName: 'Land Owner Three',
-        email: 'landowner3@easyrent.com',
+        fullName: 'Mahmudul Haque',
+        email: 'owner3@easyrent.com',
         password: '1234',
-        role: 'land_owner',
-        persona: 'land_owner',
+        role: 'owner',
+        persona: 'owner',
         status: 'Pending',
         phoneNumber: '+8801700000303',
-        profile: { profilePicture: '', address: 'Rupayan City', preferredArea: 'Uttara', nid: 'LANDOWN003', bio: 'Land owner account 3' }
-    },
-    {
-        fullName: 'Flat Owner One',
-        email: 'flatowner1@easyrent.com',
-        password: '1234',
-        role: 'flat_owner',
-        persona: 'flat_owner',
-        status: 'Active',
-        phoneNumber: '+8801700000401',
-        profile: { profilePicture: '', address: 'Sector 11 Plot 4', preferredArea: 'Uttara', nid: 'FLATOWN001', bio: 'Flat owner account 1' }
-    },
-    {
-        fullName: 'Flat Owner Two',
-        email: 'flatowner2@easyrent.com',
-        password: '1234',
-        role: 'flat_owner',
-        persona: 'flat_owner',
-        status: 'Pending',
-        phoneNumber: '+8801700000402',
-        profile: { profilePicture: '', address: 'Sector 11 Plot 4', preferredArea: 'Uttara', nid: 'FLATOWN002', bio: 'Flat owner account 2' }
-    },
-    {
-        fullName: 'Flat Owner Three',
-        email: 'flatowner3@easyrent.com',
-        password: '1234',
-        role: 'flat_owner',
-        persona: 'flat_owner',
-        status: 'Pending',
-        phoneNumber: '+8801700000403',
-        profile: { profilePicture: '', address: 'Sector 12 Plot 9', preferredArea: 'Uttara', nid: 'FLATOWN003', bio: 'Flat owner account 3' }
+        profile: { profilePicture: '', address: 'Rupayan City', preferredArea: 'Uttara', nid: 'OWNER003', propertyType: 'Flats' }
     }
 ];
 
@@ -120,6 +90,8 @@ const seedUsers = async () => {
             email: { $ne: 'admin@easyrent.com' }
         });
         await db.collection('users').deleteMany({ email: { $in: seedEmails } });
+        // Also cleanup old legacy emails if present
+        await db.collection('users').deleteMany({ email: { $regex: 'landowner|flatowner' } });
         console.log('Cleared existing seed users.');
 
         for (const entry of usersToSeed) {
@@ -156,7 +128,7 @@ const seedUsers = async () => {
             }
         }
 
-        console.log('Seeded users with single central admin and 3 users for each non-admin role.');
+        console.log('Seeded users with central admin, 3 tenants, and 3 owners.');
         process.exit(0);
     } catch (error) {
         console.error('Seed failed:', error.message);

@@ -1,4 +1,5 @@
 const { ObjectId } = require('mongodb');
+const bcrypt = require('bcrypt');
 const { getDB } = require('../config/db');
 
 const toObjectId = (id) => (ObjectId.isValid(id) ? new ObjectId(id) : null);
@@ -92,6 +93,43 @@ const updateUserStatusByAdmin = async (req, res) => {
 
         const updated = await db.collection('users').findOne({ _id: user._id });
         res.json({ message: 'User status updated', user: toSafeUserRow(updated) });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const promoteUserToSubAdmin = async (req, res) => {
+    try {
+        const db = getDB();
+        const { id } = req.params;
+        const { permissions } = req.body; // Array of strings e.g. ['zones', 'blocks']
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid user id' });
+        }
+
+        // Only Central Admin can promote to Sub Admin
+        if (req.user?.role !== 'admin') {
+            return res.status(403).json({ message: 'Only central admin can promote sub-admins' });
+        }
+
+        const user = await db.collection('users').findOne({ _id: new ObjectId(id) });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        await db.collection('users').updateOne(
+            { _id: user._id },
+            {
+                $set: {
+                    role: 'sub_admin',
+                    persona: 'sub_admin',
+                    permissions: Array.isArray(permissions) ? permissions : [],
+                    updatedAt: new Date()
+                }
+            }
+        );
+
+        const updated = await db.collection('users').findOne({ _id: user._id });
+        res.json({ message: 'User promoted to sub-admin', user: toSafeUserRow(updated) });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -269,7 +307,7 @@ const createPlot = async (req, res) => {
 
         const [block, landOwner] = await Promise.all([
             db.collection('blocks').findOne({ _id: blockObjectId }),
-            db.collection('users').findOne({ _id: landOwnerObjectId, role: 'land_owner' })
+            db.collection('users').findOne({ _id: landOwnerObjectId, role: 'owner' })
         ]);
 
         if (!block) return res.status(404).json({ message: 'Block not found' });
@@ -482,7 +520,7 @@ const createUnit = async (req, res) => {
 
         const [floor, flatOwner] = await Promise.all([
             db.collection('floors').findOne({ _id: floorObjectId }),
-            db.collection('users').findOne({ _id: flatOwnerObjectId, role: 'flat_owner' })
+            db.collection('users').findOne({ _id: flatOwnerObjectId, role: 'owner' })
         ]);
 
         if (!floor) return res.status(404).json({ message: 'Floor not found' });
@@ -515,8 +553,7 @@ const getAdminOverview = async (_req, res) => {
 
         const [
             totalTenants,
-            totalLandOwners,
-            totalFlatOwners,
+            totalOwners,
             pendingOwnerApprovals,
             blockedUsers,
             totalZones,
@@ -528,9 +565,8 @@ const getAdminOverview = async (_req, res) => {
             totalBookings
         ] = await Promise.all([
             db.collection('users').countDocuments({ role: 'tenant' }),
-            db.collection('users').countDocuments({ role: 'land_owner' }),
-            db.collection('users').countDocuments({ role: 'flat_owner' }),
-            db.collection('users').countDocuments({ role: { $in: ['land_owner', 'flat_owner'] }, status: 'Pending' }),
+            db.collection('users').countDocuments({ role: 'owner' }),
+            db.collection('users').countDocuments({ role: 'owner', status: 'Pending' }),
             db.collection('users').countDocuments({ status: { $in: ['Blocked', 'Suspended'] } }),
             db.collection('zones').countDocuments().catch(() => 0),
             db.collection('blocks').countDocuments().catch(() => 0),
@@ -554,8 +590,7 @@ const getAdminOverview = async (_req, res) => {
         res.json({
             totals: {
                 totalTenants,
-                totalLandOwners,
-                totalFlatOwners,
+                totalOwners,
                 pendingOwnerApprovals,
                 blockedUsers,
                 totalZones,
@@ -574,9 +609,258 @@ const getAdminOverview = async (_req, res) => {
     }
 };
 
+
+// --- GENERATED UPDATE/DELETE FUNCTIONS ---
+
+// Zones
+const updateZone = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, city, description } = req.body;
+        if (!toObjectId(id)) return res.status(400).json({ message: 'Invalid id' });
+        const updateDoc = { updatedAt: new Date() };
+        if (name !== undefined) updateDoc.name = String(name).trim();
+        if (city !== undefined) updateDoc.city = String(city).trim();
+        if (description !== undefined) updateDoc.description = String(description).trim();
+        await getDB().collection('zones').updateOne({ _id: toObjectId(id) }, { $set: updateDoc });
+        res.json({ message: 'Zone updated' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+const deleteZone = async (req, res) => {
+    try {
+        if (!toObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid id' });
+        await getDB().collection('zones').deleteOne({ _id: toObjectId(req.params.id) });
+        res.json({ message: 'Zone deleted' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+// Blocks
+const updateBlock = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, type, zoneId } = req.body;
+        if (!toObjectId(id)) return res.status(400).json({ message: 'Invalid id' });
+        const updateDoc = { updatedAt: new Date() };
+        if (name !== undefined) updateDoc.name = String(name).trim();
+        if (type !== undefined) updateDoc.type = String(type).trim();
+        if (zoneId) updateDoc.zoneId = toObjectId(zoneId);
+        await getDB().collection('blocks').updateOne({ _id: toObjectId(id) }, { $set: updateDoc });
+        res.json({ message: 'Block updated' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+const deleteBlock = async (req, res) => {
+    try {
+        if (!toObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid id' });
+        await getDB().collection('blocks').deleteOne({ _id: toObjectId(req.params.id) });
+        res.json({ message: 'Block deleted' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+// Plots
+const updatePlot = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { plotNumber, address, size, blockId, primaryLandOwnerId } = req.body;
+        if (!toObjectId(id)) return res.status(400).json({ message: 'Invalid id' });
+        const updateDoc = { updatedAt: new Date() };
+        if (plotNumber !== undefined) updateDoc.plotNumber = String(plotNumber).trim();
+        if (address !== undefined) updateDoc.address = String(address).trim();
+        if (size !== undefined) updateDoc.size = parseNumber(size);
+        if (blockId) updateDoc.blockId = toObjectId(blockId);
+        if (primaryLandOwnerId) updateDoc.primaryLandOwnerId = toObjectId(primaryLandOwnerId);
+        await getDB().collection('plots').updateOne({ _id: toObjectId(id) }, { $set: updateDoc });
+        res.json({ message: 'Plot updated' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+const deletePlot = async (req, res) => {
+    try {
+        if (!toObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid id' });
+        await getDB().collection('plots').deleteOne({ _id: toObjectId(req.params.id) });
+        res.json({ message: 'Plot deleted' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+// Buildings
+const updateBuilding = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, totalFloors, plotId } = req.body;
+        if (!toObjectId(id)) return res.status(400).json({ message: 'Invalid id' });
+        const updateDoc = { updatedAt: new Date() };
+        if (name !== undefined) updateDoc.name = String(name).trim();
+        if (totalFloors !== undefined) updateDoc.totalFloors = parseNumber(totalFloors);
+        if (plotId) updateDoc.plotId = toObjectId(plotId);
+        await getDB().collection('buildings').updateOne({ _id: toObjectId(id) }, { $set: updateDoc });
+        res.json({ message: 'Building updated' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+const deleteBuilding = async (req, res) => {
+    try {
+        if (!toObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid id' });
+        await getDB().collection('buildings').deleteOne({ _id: toObjectId(req.params.id) });
+        res.json({ message: 'Building deleted' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+// Floors
+const updateFloor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { floorNumber, buildingId } = req.body;
+        if (!toObjectId(id)) return res.status(400).json({ message: 'Invalid id' });
+        const updateDoc = { updatedAt: new Date() };
+        if (floorNumber !== undefined) updateDoc.floorNumber = parseNumber(floorNumber);
+        if (buildingId) updateDoc.buildingId = toObjectId(buildingId);
+        await getDB().collection('floors').updateOne({ _id: toObjectId(id) }, { $set: updateDoc });
+        res.json({ message: 'Floor updated' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+const deleteFloor = async (req, res) => {
+    try {
+        if (!toObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid id' });
+        await getDB().collection('floors').deleteOne({ _id: toObjectId(req.params.id) });
+        res.json({ message: 'Floor deleted' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+// Units
+const updateUnit = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { unitNumber, type, status, price, size, bedrooms, bathrooms, floorId, flatOwnerId } = req.body;
+        if (!toObjectId(id)) return res.status(400).json({ message: 'Invalid id' });
+        const updateDoc = { updatedAt: new Date() };
+        if (unitNumber !== undefined) updateDoc.unitNumber = String(unitNumber).trim();
+        if (type !== undefined) updateDoc.type = String(type).trim();
+        if (status !== undefined) updateDoc.status = String(status).trim();
+        if (price !== undefined) updateDoc.price = parseNumber(price);
+        if (size !== undefined) updateDoc.size = parseNumber(size);
+        if (bedrooms !== undefined) updateDoc.bedrooms = parseNumber(bedrooms);
+        if (bathrooms !== undefined) updateDoc.bathrooms = parseNumber(bathrooms);
+        if (floorId) updateDoc.floorId = toObjectId(floorId);
+        if (flatOwnerId) updateDoc.flatOwnerId = toObjectId(flatOwnerId);
+        
+        await getDB().collection('units').updateOne({ _id: toObjectId(id) }, { $set: updateDoc });
+        res.json({ message: 'Unit updated' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+const deleteUnit = async (req, res) => {
+    try {
+        if (!toObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid id' });
+        await getDB().collection('units').deleteOne({ _id: toObjectId(req.params.id) });
+        res.json({ message: 'Unit deleted' });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+};
+const createUserByAdmin = async (req, res) => {
+    try {
+        const db = getDB();
+        const { fullName, email, password, role, phoneNumber } = req.body;
+
+        if (!fullName || !email || !password || !role) {
+            return res.status(400).json({ message: 'Missing required fields' });
+        }
+
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const existing = await db.collection('users').findOne({ email: normalizedEmail });
+        if (existing) {
+            return res.status(400).json({ message: 'User with this email already exists' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const payload = {
+            fullName: String(fullName).trim(),
+            email: normalizedEmail,
+            password: hashedPassword,
+            role: String(role).trim().toLowerCase(),
+            persona: String(role).trim().toLowerCase(),
+            status: 'Active',
+            phoneNumber: phoneNumber ? String(phoneNumber).trim() : '',
+            profile: {
+                profilePicture: '',
+                address: '',
+                preferredArea: '',
+                nid: '',
+                bio: ''
+            },
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+
+        const result = await db.collection('users').insertOne(payload);
+        const createdUser = await db.collection('users').findOne({ _id: result.insertedId });
+        
+        res.status(201).json({ message: 'User created successfully', user: toSafeUserRow(createdUser) });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const deleteUserByAdmin = async (req, res) => {
+    try {
+        const db = getDB();
+        const { id } = req.params;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid user id' });
+        }
+
+        await db.collection('users').deleteOne({ _id: new ObjectId(id) });
+        res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const updateUserByAdmin = async (req, res) => {
+    try {
+        const db = getDB();
+        const { id } = req.params;
+        const { fullName, email, role, phoneNumber } = req.body;
+
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid user id' });
+        }
+
+        const user = await db.collection('users').findOne({ _id: new ObjectId(id) });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const updateData = { updatedAt: new Date() };
+        if (fullName !== undefined) updateData.fullName = String(fullName).trim();
+        if (email !== undefined) updateData.email = String(email).trim().toLowerCase();
+        if (role !== undefined) {
+            updateData.role = String(role).trim().toLowerCase();
+            updateData.persona = updateData.role;
+        }
+        if (phoneNumber !== undefined) updateData.phoneNumber = String(phoneNumber).trim();
+
+        await db.collection('users').updateOne(
+            { _id: user._id },
+            { $set: updateData }
+        );
+
+        const updatedUser = await db.collection('users').findOne({ _id: user._id });
+        res.json({ message: 'User updated successfully', user: toSafeUserRow(updatedUser) });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+
+
 module.exports = {
+    updateZone, deleteZone,
+    updateBlock, deleteBlock,
+    updatePlot, deletePlot,
+    updateBuilding, deleteBuilding,
+    updateFloor, deleteFloor,
+    updateUnit, deleteUnit,
+
     getAllUsersForAdmin,
     updateUserStatusByAdmin,
+    promoteUserToSubAdmin,
     getAdminOverview,
     getZones,
     createZone,
@@ -589,5 +873,8 @@ module.exports = {
     getFloors,
     createFloor,
     getUnits,
-    createUnit
+    createUnit,
+    createUserByAdmin,
+    updateUserByAdmin,
+    deleteUserByAdmin
 };
